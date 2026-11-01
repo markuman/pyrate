@@ -1,5 +1,7 @@
 # pyrate 🏴‍☠️
 
+![pyrate tui](pyrate.png)
+
 **tl;dr:** minimal coding harness with tui and headless mode. one loop, a handful of tools, only the configured backends. deps: `textual`, `pyyaml`, http via stdlib.
 
 - tools: `read`, `write`, `edit`, `bash`, `ask_user`, `grep`, `find`, plus mcp (stdio, http, oauth)
@@ -7,6 +9,8 @@
 - sandbox: tools and bash only in the cwd and a dedicated tmp, bash via landlock
 - sessions in sqlite, resumable and searchable
 - compaction when the context is full, AGENTS.md and skills global and per project
+
+linux only. it probably doesn't work on mac or windows, and we honestly don't care.
 
 ## install
 
