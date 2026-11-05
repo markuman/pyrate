@@ -138,6 +138,29 @@ def parse_magic(raw):
     return None
 
 
+SEARCH_TOOL = "search_tools"
+SEARCH_LOAD_MAX = 8    # query: so viele treffer werden geladen
+SEARCH_DESC = 150      # chars pro treffer-zeile
+
+
+def search_hits(query, candidates):
+    """query-wörter gegen name + description, sortiert nach trefferzahl, dann name.
+    candidates: {name: description}. keine wörter → []."""
+    words = [w for w in (query or "").lower().split() if w]
+    scored = []
+    for name, desc in candidates.items():
+        text = f"{name} {desc}".lower()
+        n = sum(1 for w in words if w in text)
+        if n:
+            scored.append((-n, name))
+    return [name for _, name in sorted(scored)]
+
+
+def _short_desc(desc, n):
+    desc = " ".join((desc or "").split())
+    return desc if len(desc) <= n else desc[: n - 1] + "…"
+
+
 def subagent_cmd(config_arg=None):
     """how pyrate calls itself: same interpreter = guaranteed same code. a `pyrate` from PATH may
     be an older copy that knows nothing about subagents. the package is importable in all venvs
@@ -223,6 +246,7 @@ class Agent:
         self.step = 0               # current step in the running/last run (0 = none yet)
         self.ask_user = ask_user
         self.mcp = mcp              # mcp.Manager oder None
+        self.loaded_tools = set()   # mcp_tool_search: per search_tools geladene schemas (session-lang)
         self._estimate_cache = None
         self.messages = db.load_messages(session_id) if session_id else []
         self.context_warnings = []
@@ -312,11 +336,56 @@ class Agent:
         return "\n\n".join(parts)
 
     def toolset(self):
-        """(allowed names, extra tools) – a snapshot, mcp tools can come and go."""
+        """(allowed names, extra tools) – a snapshot, mcp tools can come and go.
+        mcp_tool_search: ab mcp_tool_search_min mcp tools gehen nur die geladenen schemas in den
+        request, der rest steht als manifest im meta-tool search_tools. extra behält alle,
+        damit ein direkter call auf ein ungeladenes tool trotzdem aufgelöst werden kann."""
         extra = self.mcp.tools() if self.mcp else {}
         names = tools.for_mode(self.cfg.tools, self.mode, self.cfg.plan_bash)
-        names += sorted(n for n, t in extra.items() if self.mode != "plan" or t.readonly)
+        visible = sorted(n for n, t in extra.items() if self.mode != "plan" or t.readonly)
+        deferred = self.deferred_tools(visible)
+        if deferred:
+            extra = {**extra, SEARCH_TOOL: self._search_tool(deferred, extra)}
+            names.append(SEARCH_TOOL)
+        names += [n for n in visible if n not in deferred]
         return names, extra
+
+    def deferred_tools(self, visible):
+        """mcp tools, deren schema (noch) nicht im request steht. leer = tool search aus."""
+        if not self.cfg.mcp_tool_search or len(visible) < max(1, self.cfg.mcp_tool_search_min):
+            return []
+        return [n for n in visible if n not in self.loaded_tools]
+
+    def _search_tool(self, deferred, extra):
+        """meta-tool: manifest (name + kurze description) in der description, laden per
+        query (wort-treffer) oder exakten namen. geladen = ab dem nächsten call im request."""
+        # "[mcp:server] " weg: der server steht schon im namen, spart tokens pro zeile
+        cands = {n: re.sub(r"^\[mcp:[^\]]*\]\s*", "", extra[n].description) for n in deferred}
+        lines = [f"{n}: {_short_desc(cands[n], 80)}" for n in deferred]
+
+        def func(ctx, query=None, names=None):
+            picked = [n for n in (names or []) if isinstance(n, str) and n in cands]
+            unknown = [n for n in (names or []) if n not in cands and n not in self.loaded_tools]
+            if query:
+                picked += [n for n in search_hits(query, cands) if n not in picked][:SEARCH_LOAD_MAX]
+            if not picked:
+                hint = f" unknown: {', '.join(map(str, unknown))}." if unknown else ""
+                raise tools.ToolError(f"no matching tools.{hint} use other words or exact names "
+                                      "from the list in the search_tools description")
+            self.loaded_tools.update(picked)
+            out = [f"loaded {len(picked)} tool(s), callable now:"]
+            out += [f"- {n}: {_short_desc(cands[n], SEARCH_DESC)}" for n in picked]
+            if unknown:
+                out.append(f"unknown: {', '.join(map(str, unknown))}")
+            return "\n".join(out)
+
+        desc = ("load mcp tools on demand. their schemas are not sent until loaded. "
+                "pass a keyword query and/or exact names; loaded tools are callable right after.\n"
+                "available (not loaded yet):\n" + "\n".join(lines))
+        return tools.Tool(SEARCH_TOOL, desc, {
+            "query": tools._p("string", "keywords matched against tool names and descriptions", optional=True),
+            "names": tools._p("array", "exact tool names to load", optional=True, items={"type": "string"}),
+        }, func, readonly=True)
 
     def tool_names(self):
         return self.toolset()[0]
@@ -608,6 +677,8 @@ class Agent:
                     for call in calls:
                         if cancel is not None and cancel.is_set():
                             raise llm.Cancelled()
+                        # pro call neu: search_tools im selben step lädt, der nächste call darf's nutzen
+                        allowed, extra = self.toolset()
                         results.append(self._exec(call, ctx, allowed, extra, emit))
                 finally:
                     self._store_results(results)
@@ -641,6 +712,11 @@ class Agent:
             ok, result = False, f"error: arguments are not valid json ({e}): {raw[:500]}"
         emit({"type": "tool_start", "id": call["id"], "name": name, "args": args if args is not None else raw})
         if args is not None:
+            if SEARCH_TOOL in allowed and name in extra and name not in allowed:
+                # direkter call auf ein ungeladenes mcp tool (name aus dem manifest): laden statt
+                # fehler. toolset() entscheidet weiter über den modus (plan = nur readonly)
+                self.loaded_tools.add(name)
+                allowed = self.toolset()[0]
             ok, result = tools.run(name, args, ctx, allowed, extra)
         emit({"type": "tool_end", "id": call["id"], "name": name, "ok": ok, "result": result})
         return {"tool_call_id": call["id"], "name": name, "content": result, "ok": ok}

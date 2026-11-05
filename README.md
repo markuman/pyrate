@@ -235,6 +235,21 @@ pyrate --mcp-setup    # connects all servers, stores name → {description, tool
 
 connected servers always contribute their real tool descriptions; the stored list is the fallback. `description:` in the config wins over the stored one. if a server is down during setup, its previously stored tools are kept (plus an `error` field).
 
+### mcp_tool_search (schemas on demand)
+
+```yaml
+mcp_tool_search: true            # default false
+mcp_tool_search_min: 20          # only from this many mcp tools on (default 20)
+```
+
+instead of sending every mcp tool schema with every request, pyrate sends a single meta-tool `search_tools`. its description is the manifest: one line per not-yet-loaded tool (`name: description`, cut at 80 chars). the model loads tools by keyword (`query`, up to 8 hits) or exact `names`; from then on their full schemas are in the request, for the rest of the session. inspired by [open-webui#31642](https://github.com/open-webui/open-webui/issues/31642).
+
+- complements `mcp_magic`: magic decides which *servers* run, tool search which of their *schemas* get sent
+- below `mcp_tool_search_min` visible mcp tools nothing changes. in plan mode only readonly tools count and are listed
+- loaded tools are callable in the same step; a direct call to a listed but unloaded tool just loads it
+- no extra llm call – the search is a plain word match done locally
+- tui: the sidebar shows a 🔍 next to `mcp` while `mcp_tool_search` is on (next to 🪄 if magic is on too)
+
 ### oauth
 
 for http servers that want oauth (gitlab, scalable, …), per the MCP authorization spec: discovery via `WWW-Authenticate`, dynamic client registration, authorization code with PKCE, refresh.

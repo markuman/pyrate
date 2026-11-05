@@ -127,6 +127,8 @@ class Config:
     compact_model: str | None = None  # None = current main model
     mcp_magic: str | None = None      # qualified model for mcp routing before each prompt, None = off
     mcp_magic_timeout: int = 20       # s per router call; cold ollama (model load) can take a while
+    mcp_tool_search: bool = False     # mcp schemas only on demand via the search_tools meta-tool
+    mcp_tool_search_min: int = 20     # … and only from this many mcp tools on
     auto_compact: bool = True
     skill_dirs: list[Path] = field(default_factory=list)  # extra skill directories
     mcp: list[MCPServer] = field(default_factory=list)
@@ -623,6 +625,8 @@ def build(data, warnings=None, global_dir=None):
         compact_model=compact,
         mcp_magic=magic,
         mcp_magic_timeout=_opt_int(data.get("mcp_magic_timeout"), "mcp_magic_timeout") or 20,
+        mcp_tool_search=data.get("mcp_tool_search") is True,
+        mcp_tool_search_min=_non_neg_int(data.get("mcp_tool_search_min", 20), "mcp_tool_search_min"),
         auto_compact=bool(data.get("auto_compact", True)),
         skill_dirs=[Path(p).expanduser() for p in _str_list(data.get("skill_dirs"), "skill_dirs")],
         mcp=_parse_mcp(mcp_raw, warnings),

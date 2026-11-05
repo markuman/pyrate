@@ -340,6 +340,29 @@ def test_tui_toggle_magic_key_and_wand(backend, make_cfg, tmp_path):
         m.close()
 
 
+def test_tui_tool_search_magnifier(backend, make_cfg, tmp_path):
+    """sidebar zeigt 🔍 hinter mcp, solange mcp_tool_search in der config an ist."""
+    import sys
+
+    from pyrate import mcp
+    from pyrate.config import MCPServer
+    fake = str(Path(__file__).parent / "fake_mcp.py")
+
+    async def run(cfg, m):
+        app = PyrateApp(cfg, DB(":memory:"), str(tmp_path), mcp=m)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            return str(app.sidebar.render())
+
+    for on in (True, False):
+        m = mcp.Manager([MCPServer(name="fake", command=sys.executable, args=[fake])])
+        try:
+            text = asyncio.run(run(make_cfg(mcp_tool_search=on), m))
+        finally:
+            m.close()
+        assert ("mcp 🔍" in text) is on
+
+
 def test_tui_toggle_magic_hidden_without_magic_config(backend, make_cfg, tmp_path):
     """ohne mcp_magic in der config: key ist aus dem footer, der shortcut macht nichts."""
     async def run():

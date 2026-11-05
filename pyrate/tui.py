@@ -613,8 +613,10 @@ class PyrateApp(App):
                     mcp_lines.append(f"[red]✗[/] {esc(name)}")
                 else:
                     mcp_lines.append(f"[yellow]⋯[/] {esc(name)}")
-        # zauberstab hinter mcp, solange der mcp_magic-router an ist (toggle_magic schaltet um)
-        mcp_head = "[b]mcp[/]" + (" 🪄" if self.cfg.mcp_magic and self.agent.magic else "")
+        # zauberstab hinter mcp, solange der mcp_magic-router an ist (toggle_magic schaltet um),
+        # lupe, solange mcp_tool_search in der config an ist (schemas erst nach search_tools)
+        mcp_head = "[b]mcp[/]" + (" 🪄" if self.cfg.mcp_magic and self.agent.magic else "") \
+            + (" 🔍" if self.cfg.mcp_tool_search else "")
         if self.active_tool:
             status = f"[yellow]⋯[/] {esc(self.active_tool)}"
         elif self.busy:
