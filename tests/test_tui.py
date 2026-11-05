@@ -806,3 +806,22 @@ def test_pick_model_filter(backend, make_cfg, tmp_path):
             await pilot.pause()
             assert app.agent.model.startswith("qwen3:32b@")
     asyncio.run(run())
+
+
+def test_mousedown_on_stale_widget_does_not_crash(make_cfg, tmp_path):
+    # streaming swaps markdown blocks; till the next repaint the compositor still maps the
+    # removed block → MouseDown hit a widget with parent None and textual crashed.
+    from textual.geometry import Offset
+    from textual.widgets import Static
+
+    async def run():
+        app = PyrateApp(make_cfg(), DB(":memory:"), str(tmp_path))
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            screen = app.screen
+            stale = Static("weg")  # never mounted = same state as a just-removed block
+            screen.get_widget_and_offset_at = lambda x, y: (stale, Offset(0, 0))
+            ev = events.MouseDown(None, 5, 5, 0, 0, 1, False, False, False, screen_x=5, screen_y=5)
+            screen._forward_event(ev)  # used to raise AttributeError: 'NoneType' ... 'region'
+            assert screen._select_state is None
+    asyncio.run(run())

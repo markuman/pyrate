@@ -217,10 +217,22 @@ class ToolBlock(Collapsible):
 
 
 class MainScreen(Screen):
-    """only so ctrl+c (and the primary selection) yields tables as markdown."""
+    """ctrl+c (and the primary selection) yields tables as markdown; mouse guard against stale widgets."""
 
     def get_selected_text(self):
         return selected_text(self.selections)
+
+    def _forward_event(self, event):
+        # while streaming, Markdown.append swaps the last block (remove + mount). until the next
+        # repaint the compositor map still points at the removed widget; a click there crashes
+        # textual's selection code (content_widget.parent is None). drop the event, the next
+        # frame is correct again.
+        selecting = isinstance(event, events.MouseMove) and self._selecting
+        if (isinstance(event, events.MouseDown) or selecting) and not event.is_forwarded:
+            widget, _ = self.get_widget_and_offset_at(event.x, event.y)
+            if widget is not None and widget is not self and not widget.is_attached:
+                return
+        super()._forward_event(event)
 
 
 # ---------------------------------------------------------------- modals

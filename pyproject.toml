@@ -1,6 +1,6 @@
 [project]
 name = "pyrate"
-version = "2.4.0"
+version = "2.4.1"
 description = "minimalistische python-coding-harness mit tui"
 readme = "README.md"
 requires-python = ">=3.11"
