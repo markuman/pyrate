@@ -242,6 +242,8 @@ class Agent:
         # mcp_magic router on/off at runtime (toggle_magic/ctrl+g in der tui). default: aus,
         # erst der toggle schaltet ihn für die session an
         self.magic = False
+        # mcp_tool_search on/off at runtime (toggle_tool_search/ctrl+f in der tui). default aus config
+        self.tool_search = cfg.mcp_tool_search
         self.effort = effort or None    # None = default from config (model → backend → global)
         self.step = 0               # current step in the running/last run (0 = none yet)
         self.ask_user = ask_user
@@ -352,7 +354,7 @@ class Agent:
 
     def deferred_tools(self, visible):
         """mcp tools, deren schema (noch) nicht im request steht. leer = tool search aus."""
-        if not self.cfg.mcp_tool_search or len(visible) < max(1, self.cfg.mcp_tool_search_min):
+        if not self.tool_search or len(visible) < max(1, self.cfg.mcp_tool_search_min):
             return []
         return [n for n in visible if n not in self.loaded_tools]
 

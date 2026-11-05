@@ -34,6 +34,7 @@ KEYS = {
     "toggle_net":       ("ctrl+n", "tcp",        True,  True),
     "mcp_panel":        ("ctrl+o", "mcp",        True,  True),
     "toggle_magic":     ("ctrl+g", "magic",      True,  True),
+    "toggle_tool_search": ("ctrl+f", "toolsearch", True, True),
     "compact":          ("ctrl+k", "compact",    True,  True),
     "search":           ("ctrl+w", "search",     False, True),
     "cycle_view":       ("ctrl+v", "view",       False, True),

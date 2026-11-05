@@ -51,6 +51,18 @@ def test_off_and_below_min_unchanged(make_cfg, mgr, tmp_path):
     assert names == full
 
 
+def test_runtime_toggle(make_cfg, mgr, tmp_path):
+    """agent.tool_search startet mit dem config-wert und schaltet zur laufzeit um."""
+    agent = Agent(make_cfg(mcp_tool_search=True, mcp_tool_search_min=1), DB(":memory:"), tmp_path, mcp=mgr)
+    assert agent.tool_search is True and SEARCH_TOOL in agent.tool_names()
+    agent.tool_search = False
+    assert SEARCH_TOOL not in agent.tool_names() and "mcp__fake__echo" in agent.tool_names()
+    off = Agent(make_cfg(mcp_tool_search_min=1), DB(":memory:"), tmp_path, mcp=mgr)
+    assert off.tool_search is False
+    off.tool_search = True
+    assert SEARCH_TOOL in off.tool_names()
+
+
 def test_deferred_manifest_and_load(backend, make_cfg, mgr, tmp_path):
     agent = Agent(make_cfg(mcp_tool_search=True, mcp_tool_search_min=1), DB(":memory:"), tmp_path, mcp=mgr)
     small = agent.estimated_tokens()

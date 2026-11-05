@@ -138,6 +138,7 @@ pyrate -p "/zusammenfassen README.md" # invoke a skill
 | ctrl+n | tcp on/off in plan and build (default: plan off, build on; needs landlock abi ≥ 4) |
 | ctrl+o | mcp servers on/off (only with configured servers) |
 | ctrl+g | mcp_magic router on/off for the session, default off (only with `mcp_magic` in the config; sidebar shows 🪄 next to mcp while on) |
+| ctrl+f | mcp_tool_search on/off for the session, default from the config (only with mcp servers; sidebar shows 🔍 next to mcp while on) |
 | ctrl+k | compact the context, the draft in the input stays |
 | ctrl+c | copy the selection (tables as markdown) |
 | ctrl+w | search the chat, enter/ctrl+w = next hit, esc = close |
@@ -163,7 +164,7 @@ keys:
 | toggle_subagents | ctrl+s | submit | ctrl+j |
 | toggle_net | ctrl+n | cancel | escape |
 | mcp_panel | ctrl+o | quit | ctrl+d |
-| toggle_magic | ctrl+g | | |
+| toggle_magic | ctrl+g | toggle_tool_search | ctrl+f |
 
 - key format: `ctrl+…`, `alt+…`, `shift+tab`, `f1`–`f24`, … case-insensitive. a bare letter is rejected (it would swallow typing in the input); `enter`/`newline`/`ctrl+m` are reserved – in legacy terminals ctrl+m arrives as enter (`\r`) and would just insert a newline, which is why no default uses it. each key may be bound only once
 - enter always inserts a newline in the input, the configured `submit` key sends the prompt (the old `ctrl+j` then falls back to newline)
@@ -248,7 +249,7 @@ instead of sending every mcp tool schema with every request, pyrate sends a sing
 - below `mcp_tool_search_min` visible mcp tools nothing changes. in plan mode only readonly tools count and are listed
 - loaded tools are callable in the same step; a direct call to a listed but unloaded tool just loads it
 - no extra llm call – the search is a plain word match done locally
-- tui: the sidebar shows a 🔍 next to `mcp` while `mcp_tool_search` is on (next to 🪄 if magic is on too)
+- tui: `ctrl+f` (configurable via `keys:`) switches tool search on/off for the session, the config value is just the start state. already loaded schemas stay loaded. the sidebar shows a 🔍 next to `mcp` while it's on (next to 🪄 if magic is on too)
 
 ### oauth
 

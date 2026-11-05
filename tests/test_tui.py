@@ -363,6 +363,35 @@ def test_tui_tool_search_magnifier(backend, make_cfg, tmp_path):
         assert ("mcp 🔍" in text) is on
 
 
+def test_tui_toggle_tool_search_key(backend, make_cfg, tmp_path):
+    """ctrl+f schaltet tool search für die session um, 🔍 folgt dem laufzeit-zustand."""
+    import sys
+
+    from pyrate import mcp
+    from pyrate.config import MCPServer
+    fake = str(Path(__file__).parent / "fake_mcp.py")
+    m = mcp.Manager([MCPServer(name="fake", command=sys.executable, args=[fake])])
+
+    async def run():
+        app = PyrateApp(make_cfg(), DB(":memory:"), str(tmp_path), mcp=m)
+        async with app.run_test(size=(120, 50)) as pilot:
+            await pilot.pause()
+            assert app.keys["toggle_tool_search"] == "ctrl+f"
+            assert app.agent.tool_search is False  # default aus config
+            await pilot.press("ctrl+f")
+            await pilot.pause()
+            assert app.agent.tool_search is True
+            assert "mcp 🔍" in str(app.sidebar.render())
+            await pilot.press("ctrl+f")
+            await pilot.pause()
+            assert app.agent.tool_search is False
+            assert "🔍" not in str(app.sidebar.render())
+    try:
+        asyncio.run(run())
+    finally:
+        m.close()
+
+
 def test_tui_toggle_magic_hidden_without_magic_config(backend, make_cfg, tmp_path):
     """ohne mcp_magic in der config: key ist aus dem footer, der shortcut macht nichts."""
     async def run():

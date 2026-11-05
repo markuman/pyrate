@@ -614,9 +614,9 @@ class PyrateApp(App):
                 else:
                     mcp_lines.append(f"[yellow]⋯[/] {esc(name)}")
         # zauberstab hinter mcp, solange der mcp_magic-router an ist (toggle_magic schaltet um),
-        # lupe, solange mcp_tool_search in der config an ist (schemas erst nach search_tools)
+        # lupe, solange mcp_tool_search an ist (config-default, toggle_tool_search schaltet um)
         mcp_head = "[b]mcp[/]" + (" 🪄" if self.cfg.mcp_magic and self.agent.magic else "") \
-            + (" 🔍" if self.cfg.mcp_tool_search else "")
+            + (" 🔍" if self.agent.tool_search else "")
         if self.active_tool:
             status = f"[yellow]⋯[/] {esc(self.active_tool)}"
         elif self.busy:
@@ -784,6 +784,8 @@ class PyrateApp(App):
             return False  # without mcp server: key out of the footer
         if action == "toggle_magic" and (self.mcp is None or not self.cfg.mcp_magic):
             return False  # without mcp_magic in the config: key out of the footer
+        if action == "toggle_tool_search" and self.mcp is None:
+            return False  # without mcp server: key out of the footer
         return True
 
     def action_mcp_panel(self):
@@ -829,6 +831,15 @@ class PyrateApp(App):
             return
         self.agent.magic = not self.agent.magic
         self.notify(f"mcp_magic: {'on' if self.agent.magic else 'off'}", timeout=2, markup=False)
+        self.refresh_sidebar()
+
+    def action_toggle_tool_search(self):
+        """mcp_tool_search on/off for this session, default from the config. already loaded
+        schemas stay loaded when switching back on."""
+        if isinstance(self.screen, ModalScreen) or self.mcp is None:
+            return
+        self.agent.tool_search = not self.agent.tool_search
+        self.notify(f"mcp_tool_search: {'on' if self.agent.tool_search else 'off'}", timeout=2, markup=False)
         self.refresh_sidebar()
 
     def action_noop(self):
