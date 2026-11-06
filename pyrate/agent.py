@@ -16,6 +16,20 @@ from .config import ConfigError
 from .db import DEFAULT_PATH, repair
 from .sandbox import SYSTEM_RO, SYSTEM_RW, SYSTEM_SOCK, Sandbox
 
+# curl/wget in the bash tool rotate through these (round robin per bash step, via $CURL_HOME/.curlrc
+# and $WGETRC). ordinary desktop browsers, kept current: an old version is a fingerprint of its own.
+# as of 2026-11-06: safari 27.2, edge 157, firefox 159
+USER_AGENTS = [
+    # mac safari (macos stays frozen at 10_15_7 in the ua)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    "Version/27.2 Safari/605.1.15",
+    # windows edge
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    # linux firefox
+    "Mozilla/5.0 (X11; Linux x86_64; rv:159.0) Gecko/20100101 Firefox/159.0",
+]
+
 SYSTEM = """You are pyrate, a coding agent in the user's terminal.
 cwd: {cwd} | os: {os} | date: {date}
 Use the tools to inspect and change files and run commands. Read before you edit.
@@ -231,6 +245,7 @@ class Agent:
         self.cwd = str(cwd)
         self.tmp = str(tmp) if tmp else None  # this run's own tmp (main.make_tmp), None = none
         self.podman = podman                  # podman.Service or None
+        self._ua_counter = 0                  # round robin over USER_AGENTS, see _user_agent_env
         self.session_id = session_id
         self.parent_id = parent_id  # set = we are a subagent ourselves
         # max. parallel children, switchable at runtime (ctrl+s). depth 1: children don't spawn
@@ -496,6 +511,7 @@ class Agent:
         }
         if self.tmp:
             env["TMPDIR"] = self.tmp  # mktemp & co. land in our own tmp, a child pyrate creates its own inside
+            env.update(self._user_agent_env())
         if self.mode == "plan":
             env["GIT_OPTIONAL_LOCKS"] = "0"  # git status/diff must not try to write .git/index
         if self.podman is not None and self.sandbox is not None:
@@ -503,6 +519,19 @@ class Agent:
             # local state. in plan mode landlock blocks the connect
             env.update(self.podman.env(self.tmp))
         return env
+
+    def _user_agent_env(self):
+        """next browser ua for curl/wget. no env var for that in curl, so rc files in our tmp.
+        an explicit -A/--user-agent still wins, curl -q skips the rc."""
+        ua = USER_AGENTS[self._ua_counter % len(USER_AGENTS)]
+        self._ua_counter += 1
+        tmp = Path(self.tmp)
+        try:
+            (tmp / ".curlrc").write_text(f'user-agent = "{ua}"\n')
+            (tmp / "wgetrc").write_text(f"user_agent = {ua}\n")
+        except OSError:
+            return {}  # tmp gone (e.g. wiped mid-run): then curl just says curl
+        return {"CURL_HOME": self.tmp, "WGETRC": str(tmp / "wgetrc")}
 
     def podman_ok(self):
         return self.podman is not None and self.podman.error is None

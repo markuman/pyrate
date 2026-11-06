@@ -7,6 +7,7 @@
 - tools: `read`, `write`, `edit`, `bash`, `ask_user`, `grep`, `find`, plus mcp (stdio, http, oauth)
 - plan mode (read-only) and build mode, toggle with tab
 - sandbox: tools and bash only in the cwd and a dedicated tmp, bash via landlock
+- curl/wget in bash rotate a browser user agent (safari/mac, edge/windows, firefox/linux) instead of `curl/x.y`
 - sessions in sqlite, resumable and searchable
 - compaction when the context is full, AGENTS.md and skills global and per project
 
@@ -303,6 +304,7 @@ on by default (`sandbox: true`). target platform is arch, at most debian; snap, 
 - **typical pitfalls:** toolchains in `~` (pyenv, nvm, cargo) → `sandbox_ro`. caches like `~/.cache/pip` or `~/.cache/uv` → `sandbox_rw`. pyrate in a subdirectory of a repo (git doesn't see the `.git` above)
 - **unix sockets:** `connect()` only works under cwd, `$TMPDIR`, `/dev`, `sandbox_rw` and on `/run/systemd/resolve` (dns). otherwise e.g. `systemd-run --user …` via the session bus would be the complete escape, plus ssh-/gpg-agent, docker.sock, x11. needs landlock with `RESOLVE_UNIX` (pyrate asks the kernel, tested with abi 9 on linux 7.1); without it unix sockets are open. to allow a single socket: `sandbox_rw: [/run/user/1000/gnupg/S.gpg-agent]`
 - **new in 1.7.0, if something suddenly stops working:** if a tool in bash reports `connect: permission denied`, `Error connecting to agent` (ssh-add), `Failed to connect to bus` (systemctl --user) or `can't connect to gpg-agent`, it wants a unix socket. that's the new block, not broken. typical candidates: `$SSH_AUTH_SOCK` (often `/tmp/ssh-*/agent.*` or `/run/user/*/…`), gpg-agent, docker, daemons of toolchains in `~` (gradle, bazel, sccache). allow the socket (or its dir) via `sandbox_rw`, but only if the model really may: an ssh-agent means "may log in anywhere you can"
+- **user agent:** curl and wget in bash don't announce themselves as `curl/x.y`, they rotate round robin per bash step through safari/mac, edge/windows and firefox/linux (`USER_AGENTS` in `pyrate/agent.py`, versions as of the release – maintain them, an outdated browser is a fingerprint too). done via `$CURL_HOME/.curlrc` and `$WGETRC` in the run's tmp. an explicit `-A` wins, `curl -q` skips it. only helps against dumb ua filters, not against tls fingerprinting (cloudflare & co.). pyrate's own requests (llm, mcp, oauth) still send `pyrate/x.y`
 - **limits:** with tcp on (default in build, `ctrl+n` in plan) everything readable can leak out. env vars (incl. api keys), udp and on older kernels unix sockets (see above) are not covered by landlock, not even with tcp off. the file tools check before access, not atomically (toctou); only a parallel process could exploit that, and bash itself is inside the sandbox
 
 ### podman

@@ -130,6 +130,23 @@ def test_tool_env_reaches_bash(backend, make_cfg, tmp_path):
     assert end["result"].startswith(f"{agent.session_id}:3")
 
 
+def test_user_agent_rotates(make_cfg, tmp_path):
+    from pyrate.agent import USER_AGENTS
+    agent = Agent(make_cfg(), DB(":memory:"), tmp_path, tmp=tmp_path)
+    seen = []
+    for _ in range(len(USER_AGENTS) + 1):
+        env = agent.tool_env()
+        assert env["CURL_HOME"] == str(tmp_path)
+        curlrc = (tmp_path / ".curlrc").read_text()
+        assert curlrc.startswith('user-agent = "Mozilla/5.0') and "pyrate" not in curlrc
+        wgetrc = Path(env["WGETRC"]).read_text()
+        seen.append(curlrc)
+        assert wgetrc == curlrc.replace('user-agent = "', "user_agent = ").replace('"\n', "\n")
+    assert seen[:len(USER_AGENTS)] == [f'user-agent = "{ua}"\n' for ua in USER_AGENTS]
+    assert seen[-1] == seen[0]
+    assert "CURL_HOME" not in Agent(make_cfg(), DB(":memory:"), tmp_path).tool_env()  # no tmp, no rc
+
+
 # ---------------------------------------------------------------- slots
 
 class _Stdin:
